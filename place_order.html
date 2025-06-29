@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Place Order</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <style>
+    body { background-color: #f4f4f4; font-family: Arial, sans-serif; }
+    .order-form {
+      max-width: 600px;
+      margin: 40px auto;
+      background: #4d5d5a;
+      padding: 30px 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    .order-form h2 { text-align: center; margin-bottom: 25px; font-weight: bold; color: aqua; }
+    .product-img { max-width: 100%; border-radius: 10px; margin-bottom: 20px; object-fit: cover; }
+    .btn-submit {
+      background-color: #28a745;
+      color: white;
+      width: 100%;
+      font-size: 1.1rem;
+    }
+    .user-info {
+      background-color: #f8f9fa;
+      padding: 15px 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      font-size: 0.95rem;
+    }
+    .quantity-control {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .quantity-control button {
+      padding: 4px 12px;
+      font-size: 1.1rem;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+<div class="order-form">
+  <h2>Place Your Order</h2>
+  <div class="text-center">
+    <img id="productImage" src="" alt="Product Image" class="product-img">
+  </div>
+  <div class="user-info" id="userInfo"></div>
+
+  <form id="orderForm">
+    <div class="mb-3">
+      <label class="form-label text-white">Quantity</label>
+      <div class="quantity-control">
+        <button type="button" class="btn btn-secondary" onclick="updateQty(-1)">−</button>
+        <input type="text" id="quantity" value="1" class="form-control text-center" style="width: 60px;" readonly>
+        <button type="button" class="btn btn-secondary" onclick="updateQty(1)">+</button>
+        <span class="text-white ms-3" id="stockInfo"></span>
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-submit mt-3">Place Order</button>
+  </form>
+</div>
+
+<script>
+  const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0cHd4dHZyaHRmdmR5YWR6Ynl4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA0MTk3NTksImV4cCI6MjA2NTk5NTc1OX0.MJ4yZ0DtfB05tDlJTJdtvwppPcSAGCX5Y9si3dNJkSE';
+  const supabase = window.supabase.createClient(
+    'https://btpwxtvrhtfvdyadzbyx.supabase.co',
+    supabaseKey
+  );
+
+  const params = new URLSearchParams(window.location.search);
+  const img = params.get("img");
+  const productName = params.get("name");
+  const productPrice = params.get("price");
+  const productId = params.get("id");
+
+  let productStock = 0;
+
+  async function loadUserProfile() {
+    const session = await supabase.auth.getSession();
+    const userId = session.data?.session?.user?.id;
+    if (!userId) {
+      console.warn("No user session found.");
+      return;
+    }
+
+    const { data: profile, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", userId)
+      .single();
+
+    if (error) {
+      console.error("Error fetching user profile:", error.message);
+      return;
+    }
+
+    if (profile) {
+      localStorage.setItem("user", JSON.stringify(profile));
+    }
+  }
+
+  async function getProductStock() {
+    if (!productId) {
+      alert("❌ Product ID is missing in the URL.");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("products")
+      .select("stock")
+      .eq("id", productId)
+      .single();
+
+    if (error) {
+      console.error("Failed to load stock:", error.message);
+      alert("⚠️ Could not load product stock.");
+      return;
+    }
+
+    if (data) {
+      productStock = data.stock;
+      document.getElementById("stockInfo").innerText = `In Stock: ${productStock}`;
+
+      if (productStock === 0) {
+        document.querySelector(".btn-submit").disabled = true;
+        alert("❌ This product is out of stock.");
+      }
+    } else {
+      alert("⚠️ Product not found or no stock information available.");
+      document.querySelector(".btn-submit").disabled = true;
+    }
+  }
+
+  function updateQty(change) {
+    const input = document.getElementById("quantity");
+    let qty = parseInt(input.value);
+    
+    if (isNaN(qty) || qty < 1) {
+      qty = 1;
+    }
+
+    qty += change;
+    if (qty < 1) {
+      qty = 1;
+    }
+    if (qty > productStock) {
+      qty = productStock;
+    }
+
+    input.value = qty;
+  }
+
+  async function initOrderPage() {
+    await loadUserProfile();
+    await getProductStock();
+
+    const user = JSON.parse(localStorage.getItem("user"));
+    const infoDiv = document.getElementById("userInfo");
+
+    document.getElementById("productImage").src = img;
+
+    if (user) {
+      infoDiv.innerHTML = `
+        <h5>Your Info:</h5>
+        <p><strong>Name:</strong> ${user.name}</p>
+        <p><strong>Mobile:</strong> ${user.mobile}</p>
+        <p><strong>Address:</strong> ${user.address}</p>`;
+    } else {
+      infoDiv.innerHTML = `<p class="text-danger">Please log in first to place an order.</p>`;
+      document.querySelector(".btn-submit").disabled = true;
+    }
+
+    document.getElementById("orderForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const quantity = parseInt(document.getElementById("quantity").value);
+
+      if (!user) {
+        alert("Please log in to place an order.");
+        return;
+      }
+
+      if (!productId || productStock <= 0) {
+        alert("❌ This product is currently out of stock or invalid.");
+        return;
+      }
+
+      if (quantity > productStock) {
+        alert(`❌ Only ${productStock} items are in stock. Please reduce the quantity.`);
+        return;
+      }
+
+      if (quantity < 1) {
+        alert("❌ Quantity must be at least 1.");
+        return;
+      }
+
+      const { error: orderError } = await supabase.from("orders").insert([{
+        user_id: user.id,
+        name: user.name,
+        mobile: user.mobile,
+        address: user.address,
+        product_name: productName,
+        product_price: productPrice,
+        product_img: img,
+        quantity: quantity,
+        product_id: productId,
+        status: "pending"
+      }]);
+
+      if (!orderError) {
+        const { error: stockError } = await supabase.from("products")
+          .update({ stock: productStock - quantity })
+          .eq("id", productId);
+
+        if (!stockError) {
+          alert("✅ Order placed successfully!");
+          window.location.href = "index.html";
+        } else {
+          alert("❌ Order placed but failed to update stock. Please contact support.");
+          console.error("Stock update error:", stockError);
+        }
+      } else {
+        alert("❌ Failed to place the order. " + orderError.message);
+        console.error("Order placement error:", orderError);
+      }
+    });
+  }
+
+  initOrderPage();
+</script>
+</body>
+</html>

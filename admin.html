@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Admin Panel - UniCartX</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+    <style>
+        /* Custom styles for status text colors */
+        .status-pending { color: #0dcaf0; } /* Info blue */
+        .status-packed { color: #0d6efd; } /* Primary blue */
+        .status-shipped { color: #6f42c1; } /* Purple */
+        .status-out_for_delivery { color: #20c997; } /* Teal */
+        .status-delivered { color: #198754; } /* Success green */
+        .status-return-requested { color: #ffc107; } /* Warning yellow */
+        .status-returned { color: #fd7e14; } /* Orange */
+        .status-cancelled { color: #dc3545; } /* Danger red */
+
+        /* Basic blink animation (for user side) */
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .blink {
+            animation: blink 1s linear infinite;
+        }
+        /* New style for category images */
+        .category-checkbox-label img {
+            width: 30px; /* Small icon for checkbox */
+            height: 30px;
+            object-fit: contain;
+            vertical-align: middle;
+            margin-right: 5px;
+        }
+        .category-input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .category-input-group input[type="text"],
+        .category-input-group input[type="url"] {
+            flex-grow: 1;
+        }
+    </style>
+</head>
+<body class="container mt-4">
+    <h2 class="mb-4 text-center">🛠️ Admin Panel - UniCartX</h2>
+
+    <div class="text-end mb-3">
+        <button onclick="adminLogout()" class="btn btn-sm btn-danger">Logout</button>
+    </div>
+
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item"><a class="nav-link active" onclick="showTab('usersTab')">👥 View Users</a></li>
+        <li class="nav-item"><a class="nav-link" onclick="showTab('manageUsersTab')">🛠️ Manage Users</a></li>
+        <li class="nav-item"><a class="nav-link" onclick="showTab('productsTab')">🛒 Add Product</a></li>
+        <li class="nav-item"><a class="nav-link" onclick="showTab('manageProductsTab')">🗑️ Manage Products</a></li>
+        <li class="nav-item"><a class="nav-link" onclick="showTab('ordersTab')">📦 View Orders</a></li>
+    </ul>
+
+    <div id="usersTab">
+        <h4>Registered Users</h4>
+        <table class="table table-bordered">
+            <thead><tr><th>Name</th><th>Mobile</th><th>Address</th></tr></thead>
+            <tbody id="userList"></tbody>
+        </table>
+    </div>
+
+    <div id="manageUsersTab" style="display:none;">
+        <h4>Edit/Delete Users</h4>
+        <table class="table table-bordered">
+            <thead><tr><th>Name</th><th>Mobile</th><th>Password</th><th>Address</th><th>Actions</th></tr></thead>
+            <tbody id="manageUserList"></tbody>
+        </table>
+    </div>
+
+    <div id="productsTab" style="display:none;">
+        <h4>Add New Product</h4>
+        <form onsubmit="addProduct(event)">
+            <div class="form-group mb-2">
+                <label>Categories (Select multiple):</label><br/>
+                <div id="categoryCheckboxes">
+                    </div>
+            </div>
+
+            <div class="form-group mb-3">
+                <label for="newCategoryName">Or Add New Category:</label>
+                <div class="category-input-group">
+                    <input type="text" class="form-control" id="newCategoryName" placeholder="New Category Name (e.g., Books)">
+                    <input type="url" class="form-control" id="newCategoryImage" placeholder="New Category Image URL (e.g., https://example.com/books.png)">
+                    <button type="button" class="btn btn-success" onclick="addNewCategory()">Add Category</button>
+                </div>
+                <p class="mt-1 text-success" id="newCategoryStatus"></p>
+            </div>
+
+
+            <div class="form-group mb-2">
+                <label>Container (Homepage section):</label>
+                <select class="form-control" id="prodContainer">
+                    <option value="">None</option>
+                    <option value="featured1">Featured 1</option>
+                    <option value="featured2">Featured 2</option>
+                    <option value="featured3">Featured 3</option>
+                    <option value="featured4">Featured 4</option>
+                    <option value="featured5">Featured 5</option>
+                </select>
+            </div>
+
+            <input class="form-control mb-2" placeholder="Image URL" id="prodImg" required />
+            <input class="form-control mb-2" placeholder="Product Name" id="prodName" required />
+            <textarea class="form-control mb-2" placeholder="Description" id="prodDesc" required></textarea>
+            <input class="form-control mb-2" placeholder="Price" id="prodPrice" type="number" step="0.01" required />
+            <input class="form-control mb-2" placeholder="Stock Available" id="prodStock" type="number" min="0" required />
+
+            <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" id="isHotSale">
+                <label class="form-check-label" for="isHotSale">
+                    Mark as Hot Sale Product (Appears in Marquee)
+                </label>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Add Product</button>
+        </form>
+        <p class="mt-3 text-success" id="addStatus"></p>
+    </div>
+
+    <div id="manageProductsTab" style="display:none;">
+        <h4>Manage Products</h4>
+        <input class="form-control mb-2" id="productSearchInput" placeholder="Search products..." oninput="filterProductList()" />
+        <table class="table table-bordered">
+            <thead><tr><th>Image</th><th>Name</th><th>Price</th><th>Categories</th><th>Container</th><th>Stock</th><th>Hot Sale</th><th>Actions</th></tr></thead>
+            <tbody id="productList"></tbody>
+        </table>
+    </div>
+
+    <div id="ordersTab" style="display:none;">
+        <h4>All Orders</h4>
+        <table class="table table-bordered">
+            <thead><tr><th>Name</th><th>Mobile</th><th>Address</th><th>Product</th><th>Price</th><th>Image</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody id="orderList"></tbody>
+        </table>
+    </div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const supabaseUrl = 'https://btpwxtvrhtfvdyadzbyx.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0cHd4dHZyaHRmdmR5YWR6Ynl4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA0MTk3NTksImV4cCI6MjA2NTk5NTc1OX0.MJ4yZ0DtfB05tDlJTJdtvwppPcSAGCX5Y9si3dNJkSE'; // Replace with your actual Supabase Public Key
+    const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+    // Admin login check (Important: Keep this for security)
+    if (localStorage.getItem("isAdminLoggedIn") !== "true") {
+        alert("Access denied. Please log in as an administrator.");
+        window.location.href = "admin_login.html";
+    }
+
+    function showTab(id) {
+        document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+        document.querySelector(`[onclick="showTab('${id}')"]`).classList.add('active');
+
+        ['usersTab', 'manageUsersTab', 'productsTab', 'manageProductsTab', 'ordersTab'].forEach(t =>
+            document.getElementById(t).style.display = 'none'
+        );
+        document.getElementById(id).style.display = 'block';
+
+        if (id === 'usersTab') loadUsers();
+        if (id === 'manageUsersTab') loadManageUsers();
+        if (id === 'productsTab') loadCategoriesForProductAdd(); // New: Load categories when productsTab is shown
+        if (id === 'manageProductsTab') loadProducts();
+        if (id === 'ordersTab') loadOrders();
+    }
+
+    function adminLogout() {
+        localStorage.removeItem("isAdminLoggedIn");
+        alert("Logged out.");
+        window.location.href = "admin_login.html";
+    }
+
+    // --- User Management (No Changes) ---
+    async function loadUsers() {
+        const { data, error } = await supabase.from("users").select("*");
+        const list = document.getElementById("userList");
+        if (error) {
+            list.innerHTML = `<tr><td colspan='3'>⚠️ ${error.message}</td></tr>`;
+        } else {
+            list.innerHTML = data.map(u => `<tr><td>${u.name}</td><td>${u.mobile}</td><td>${u.address}</td></tr>`).join("") || "<tr><td colspan='3'>No users found.</td></tr>";
+        }
+    }
+
+    async function loadManageUsers() {
+        const { data, error } = await supabase.from("users").select("*");
+        const table = document.getElementById("manageUserList");
+        if (error) {
+            table.innerHTML = `<tr><td colspan='5'>⚠️ ${error.message}</td></tr>`;
+        } else {
+            table.innerHTML = data.map(user => `
+                <tr>
+                    <td><input value="${user.name}" id="name_${user.mobile}"/></td>
+                    <td>${user.mobile}</td>
+                    <td><input value="${user.password}" id="pass_${user.mobile}"/></td>
+                    <td><input value="${user.address}" id="addr_${user.mobile}"/></td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="updateUser('${user.mobile}')">Update</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteUser('${user.mobile}')">Delete</button>
+                    </td>
+                </tr>
+            `).join("") || "<tr><td colspan='5'>No users.</td></tr>";
+        }
+    }
+
+    async function updateUser(mobile) {
+        const name = document.getElementById("name_" + mobile).value;
+        const password = document.getElementById("pass_" + mobile).value;
+        const address = document.getElementById("addr_" + mobile).value;
+
+        const { error } = await supabase.from("users").update({ name, password, address }).eq("mobile", mobile);
+        if (error) {
+            alert("❌ Error: " + error.message);
+        } else {
+            alert("✅ User updated.");
+            loadManageUsers();
+        }
+    }
+
+    async function deleteUser(mobile) {
+        if (!confirm("Are you sure you want to delete this user?")) return;
+        const { error } = await supabase.from("users").delete().eq("mobile", mobile);
+        if (error) {
+            alert("❌ Error: " + error.message);
+        } else {
+            alert("🗑️ Deleted.");
+            loadManageUsers();
+        }
+    }
+
+    // --- Product Management (Modified to include Category and Hot Sale logic) ---
+
+    // Function to load categories into checkboxes
+    async function loadCategoriesForProductAdd() {
+        const { data, error } = await supabase.from('categories').select('*').order('name', { ascending: true });
+        const categoryCheckboxesDiv = document.getElementById('categoryCheckboxes');
+
+        if (error) {
+            console.error('Error fetching categories:', error.message);
+            categoryCheckboxesDiv.innerHTML = `<p class="text-danger">Error loading categories: ${error.message}</p>`;
+            return;
+        }
+
+        if (data.length === 0) {
+            categoryCheckboxesDiv.innerHTML = `<p class="text-info">No categories found. Add a new one below!</p>`;
+            return;
+        }
+
+        categoryCheckboxesDiv.innerHTML = data.map(category => `
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="checkbox" id="category_${category.id}" value="${category.name}" name="category">
+                <label class="form-check-label category-checkbox-label" for="category_${category.id}">
+                    <img src="${category.image_url}" alt="${category.name} icon" /> ${category.name}
+                </label>
+            </div>
+        `).join('');
+    }
+
+    // Function to add a new category
+    async function addNewCategory() {
+        const newCategoryNameInput = document.getElementById('newCategoryName');
+        const newCategoryImageInput = document.getElementById('newCategoryImage');
+        const newCategoryStatus = document.getElementById('newCategoryStatus');
+
+        const categoryName = newCategoryNameInput.value.trim();
+        const categoryImage = newCategoryImageInput.value.trim();
+
+        if (!categoryName || !categoryImage) {
+            newCategoryStatus.className = 'text-danger';
+            newCategoryStatus.textContent = 'Please enter both category name and image URL.';
+            return;
+        }
+
+        // Basic URL validation
+        try {
+            new URL(categoryImage);
+        } catch (e) {
+            newCategoryStatus.className = 'text-danger';
+            newCategoryStatus.textContent = 'Please enter a valid image URL.';
+            return;
+        }
+
+        const { data, error } = await supabase
+            .from('categories')
+            .insert([{ name: categoryName, image_url: categoryImage }]);
+
+        if (error) {
+            newCategoryStatus.className = 'text-danger';
+            if (error.code === '23505') { // Unique constraint violation code
+                newCategoryStatus.textContent = `❌ Error: Category "${categoryName}" already exists.`;
+            } else {
+                newCategoryStatus.textContent = `❌ Error adding category: ${error.message}`;
+            }
+            console.error('Error adding category:', error);
+        } else {
+            newCategoryStatus.className = 'text-success';
+            newCategoryStatus.textContent = `✅ Category "${categoryName}" added successfully!`;
+            newCategoryNameInput.value = ''; // Clear inputs
+            newCategoryImageInput.value = '';
+            loadCategoriesForProductAdd(); // Reload categories to show the new one
+        }
+    }
+
+
+    async function addProduct(e) {
+        e.preventDefault();
+        const categoryInputs = document.querySelectorAll("#categoryCheckboxes input[name='category']:checked");
+        const categories = Array.from(categoryInputs).map(el => el.value);
+        const isHotSale = document.getElementById("isHotSale").checked; // Get checkbox value
+
+        const product = {
+            name: document.getElementById("prodName").value,
+            description: document.getElementById("prodDesc").value,
+            price: parseFloat(document.getElementById("prodPrice").value),
+            img: document.getElementById("prodImg").value,
+            stock: parseInt(document.getElementById("prodStock").value),
+            container: document.getElementById("prodContainer").value,
+            categories: categories,
+            is_hot_sale: isHotSale, // Add hot sale status
+            isActive: true
+        };
+
+        const { error } = await supabase.from("products").insert(product);
+        document.getElementById("addStatus").textContent = error ? "❌ " + error.message : "✅ Product added!";
+        if (!error) {
+            e.target.reset();
+            // Clear specific inputs for a fresh form
+            document.getElementById("prodName").value = '';
+            document.getElementById("prodDesc").value = '';
+            document.getElementById("prodPrice").value = '';
+            document.getElementById("prodImg").value = '';
+            document.getElementById("prodStock").value = '';
+            document.getElementById("prodContainer").value = '';
+            document.getElementById("isHotSale").checked = false; // Reset hot sale checkbox
+            categoryInputs.forEach(checkbox => checkbox.checked = false);
+        }
+    }
+
+    async function loadProducts() {
+        const { data, error } = await supabase.from("products").select("*");
+        const list = document.getElementById("productList");
+        if (error) {
+            list.innerHTML = `<tr><td colspan='8'>⚠️ ${error.message}</td></tr>`; // Updated colspan
+        } else {
+            list.innerHTML = data.map(p => `
+                <tr class="product-row">
+                    <td><img src="${p.img}" width="80"/></td>
+                    <td class="product-name">${p.name}</td>
+                    <td>${p.price}</td>
+                    <td>${p.categories ? p.categories.join(', ') : '-'}</td>
+                    <td>${p.container || '-'}</td>
+                    <td>${p.stock}</td>
+                    <td>${p.is_hot_sale ? '✅ Yes' : '❌ No'}</td> <td><button class="btn btn-sm btn-danger" onclick="deleteProduct('${p.id}')">Delete</button></td>
+                </tr>
+            `).join("") || "<tr><td colspan='8'>No products.</td></tr>"; // Updated colspan
+        }
+    }
+
+    function filterProductList() {
+        const query = document.getElementById("productSearchInput").value.toLowerCase();
+        document.querySelectorAll(".product-row").forEach(row => {
+            const name = row.querySelector(".product-name").innerText.toLowerCase();
+            row.style.display = name.includes(query) ? '' : 'none';
+        });
+    }
+
+    async function deleteProduct(id) {
+        // First, fetch the product to check its 'is_hot_sale' status
+        const { data: product, error: fetchError } = await supabase
+            .from("products")
+            .select("is_hot_sale")
+            .eq("id", id)
+            .single();
+
+        if (fetchError) {
+            alert("❌ Error fetching product details: " + fetchError.message);
+            return;
+        }
+
+        if (product && product.is_hot_sale) {
+            // If it's a hot sale product, unmark it
+            if (!confirm("This is a Hot Sale Product. Do you want to unmark it as Hot Sale instead of deleting it?")) {
+                // If user cancels, or chooses not to unmark, allow deletion but re-confirm
+                if (!confirm("Are you sure you want to delete this Hot Sale Product completely? This action cannot be undone.")) {
+                    return; // User cancelled second confirmation, so do nothing
+                }
+            } else {
+                // User chose to unmark as Hot Sale
+                const { error: updateError } = await supabase
+                    .from("products")
+                    .update({ is_hot_sale: false })
+                    .eq("id", id);
+
+                if (updateError) {
+                    alert("❌ Error unmarking product as Hot Sale: " + updateError.message);
+                } else {
+                    alert("✅ Product unmarked as Hot Sale.");
+                    loadProducts(); // Reload the list
+                }
+                return; // Exit after unmarking
+            }
+        } else {
+            // If it's not a hot sale product, confirm deletion as usual
+            if (!confirm("Are you sure you want to delete this product? This action cannot be undone.")) {
+                return;
+            }
+        }
+
+        // If we reach here, it means either:
+        // 1. It was not a hot sale product and user confirmed deletion.
+        // 2. It was a hot sale product, user opted not to unmark, and confirmed complete deletion.
+        const { error: deleteError } = await supabase.from("products").delete().eq("id", id);
+        if (deleteError) {
+            alert("❌ Error deleting product: " + deleteError.message);
+        } else {
+            alert("🗑️ Product deleted.");
+            loadProducts(); // Reload the list
+        }
+    }
+
+
+    // --- Order Management (No Changes) ---
+    async function loadOrders() {
+        const { data, error } = await supabase.from("orders").select("*");
+        const list = document.getElementById("orderList");
+        if (error) {
+            list.innerHTML = `<tr><td colspan='8'>⚠️ ${error.message}</td></tr>`;
+        } else {
+            list.innerHTML = data.map(order => {
+                let statusDisplay = '';
+                let actionButtons = '';
+
+                switch (order.status) {
+                    case 'pending':
+                        statusDisplay = `<span class="status-pending fw-bold">Pending</span>`;
+                        actionButtons = `<button class="btn btn-sm btn-primary" onclick="updateOrderStatus('${order.id}', 'packed')">Mark Packed</button>`;
+                        break;
+                    case 'packed':
+                        statusDisplay = `<span class="status-packed fw-bold">Packed</span>`;
+                        actionButtons = `<button class="btn btn-sm btn-primary" onclick="updateOrderStatus('${order.id}', 'shipped')">Mark Shipped</button>`;
+                        break;
+                    case 'shipped':
+                        statusDisplay = `<span class="status-shipped fw-bold">Shipped</span>`;
+                        actionButtons = `<button class="btn btn-sm btn-primary" onclick="updateOrderStatus('${order.id}', 'out_for_delivery')">Out for Delivery</button>`;
+                        break;
+                    case 'out_for_delivery':
+                        statusDisplay = `<span class="status-out_for_delivery fw-bold">Out for Delivery</span>`;
+                        actionButtons = `<button class="btn btn-sm btn-success" onclick="updateOrderStatus('${order.id}', 'delivered')">Mark Delivered</button>`;
+                        break;
+                    case 'delivered':
+                        statusDisplay = `<span class="status-delivered fw-bold">Delivered</span>`;
+                        actionButtons = ''; // No action for delivered beyond delete
+                        break;
+                    case 'return_requested':
+                        statusDisplay = `<span class="status-return-requested fw-bold">Return Requested</span>`;
+                        actionButtons = `<button class="btn btn-sm btn-warning" onclick="acceptReturn('${order.id}')">Accept Return</button>`;
+                        break;
+                    case 'returned':
+                        statusDisplay = `<span class="status-returned fw-bold">Returned</span>`;
+                        actionButtons = ''; // No action for returned beyond delete
+                        break;
+                    case 'cancelled':
+                        statusDisplay = `<span class="status-cancelled fw-bold">Cancelled</span>`;
+                        actionButtons = ''; // No action for cancelled beyond delete
+                        break;
+                    default:
+                        statusDisplay = `<span>${order.status || 'unknown'}</span>`;
+                        actionButtons = '';
+                        break;
+                }
+
+                return `
+                    <tr>
+                        <td>${order.name}</td>
+                        <td>${order.mobile}</td>
+                        <td>${order.address}</td>
+                        <td>${order.product_name}</td>
+                        <td>${order.product_price}</td>
+                        <td><img src="${order.product_img}" width="60"/></td>
+                        <td>${statusDisplay}</td>
+                        <td>
+                            ${actionButtons}
+                            <button class="btn btn-sm btn-danger mt-1" onclick="deleteOrder('${order.id}')">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            }).join("") || "<tr><td colspan='8'>No orders.</td></tr>";
+        }
+    }
+
+    async function updateOrderStatus(orderId, newStatus) {
+        const { error } = await supabase
+            .from("orders")
+            .update({ status: newStatus })
+            .eq("id", orderId);
+
+        if (error) {
+            alert("❌ Error updating order status: " + error.message);
+            console.error("Error updating order status:", error);
+        } else {
+            alert(`✅ Order status updated to ${newStatus.replace(/_/g, ' ').toUpperCase()}.`);
+            loadOrders();
+        }
+    }
+
+    async function acceptReturn(id) {
+        if (!confirm("Accept return for this order? This will mark it as 'returned'.")) return;
+        const { error } = await supabase.from("orders").update({ status: "returned" }).eq("id", id);
+        if (error) {
+            alert("❌ Error accepting return: " + error.message);
+        } else {
+            alert("✅ Return accepted.");
+            loadOrders();
+        }
+    }
+
+    async function deleteOrder(id) {
+        if (!confirm("Are you sure you want to delete this order? This action cannot be undone.")) return;
+        const { error } = await supabase.from("orders").delete().eq("id", id);
+        if (error) {
+            alert("❌ Error deleting order: " + error.message);
+        } else {
+            alert("🗑️ Order deleted.");
+            loadOrders();
+        }
+    }
+
+    // Initial tab load
+    document.addEventListener('DOMContentLoaded', () => {
+        showTab("usersTab");
+    });
+</script>
+</body>
+</html>

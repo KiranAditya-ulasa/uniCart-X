@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product Details</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+
+  <style>
+    body {
+      background-color: #021718cc; /* Matching homepage background */
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column; /* Allow vertical stacking of content */
+      justify-content: center;
+      align-items: center;
+      padding: 30px 15px;
+      min-height: 100vh;
+      color: #f8f9fa; /* Default text color for body */
+    }
+
+    .product-container {
+      width: 100%;
+      max-width: 700px; /* Slightly wider for better display */
+      background-color: #1a2c34; /* Matching homepage navbar/card background */
+      color: #f8f9fa;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      padding: 25px 20px;
+      border-radius: 12px;
+      margin-bottom: 30px; /* Space before similar products section */
+    }
+
+    .product-image img {
+      width: 100%;
+      height: auto;
+      max-height: 400px;
+      object-fit: contain;
+      border-radius: 8px;
+      background-color: #e9ecef; /* Light background for image */
+      padding: 10px;
+    }
+
+    .product-details {
+      padding-top: 20px;
+    }
+
+    .product-details h2 {
+      font-size: 2.2rem;
+      font-weight: bold;
+      color: #f8f9fa;
+      margin-bottom: 15px;
+    }
+
+    .product-details p {
+      font-size: 1rem;
+      line-height: 1.6;
+      color: #e2e6ea;
+      margin-bottom: 10px;
+    }
+
+    .product-details .price {
+      font-size: 1.8rem;
+      font-weight: bold;
+      color: #ffd814; /* Highlight color for price */
+      margin-bottom: 15px;
+    }
+
+    .product-details .stock {
+      font-size: 0.95rem;
+      color: #ff6b6b; /* Danger color for out of stock */
+      font-weight: bold;
+      margin-bottom: 20px;
+    }
+
+    .btn-action {
+      background-color: #00ffcc;
+      border-color: #00ffcc;
+      color: #021718cc;
+      font-weight: bold;
+      padding: 10px 20px;
+      border-radius: 8px;
+      transition: background-color 0.3s ease, transform 0.2s ease;
+    }
+
+    .btn-action:hover {
+      background-color: #00e6b8;
+      border-color: #00e6b8;
+      transform: translateY(-2px);
+    }
+
+    .btn-outline-secondary {
+      color: #a9e4e5;
+      border-color: #a9e4e5;
+      font-weight: bold;
+      padding: 10px 20px;
+      border-radius: 8px;
+      transition: background-color 0.3s ease, color 0.3s ease, transform 0.2s ease;
+    }
+
+    .btn-outline-secondary:hover {
+      background-color: #a9e4e5;
+      color: #1a2c34;
+      transform: translateY(-2px);
+    }
+    
+    /* Similar Products Section Styling */
+    .similar-products-section {
+        width: 100%;
+        max-width: 1200px; /* Max-width for the grid container */
+        margin-top: 40px;
+        padding: 20px;
+        background-color: #021718cc; /* Keep body background */
+        align-self: center; /* Center the section on the page */
+    }
+
+    .similar-products-section h3 {
+        color: #f8f9fa;
+        font-weight: bold;
+        margin-bottom: 25px;
+        text-align: center;
+        font-size: 2.2rem;
+    }
+
+    /* Matching homepage product grid layout */
+    .similar-products-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); /* Adjusted minmax for better fit */
+        gap: 20px;
+        justify-content: center; /* Center grid items */
+        padding: 0 10px; /* Small padding from sides */
+    }
+
+    /* Product Card Styling (Copied from index.html with adjustments for image size) */
+    .product-card {
+        background-color: #2a414d;
+        color: #f8f9fa;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+        transition: transform 0.2s ease;
+        position: relative;
+        overflow: hidden;
+        border: 2px solid transparent;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        height: 380px; /* Fixed height for consistent card size */
+        cursor: pointer;
+    }
+
+    .product-card:hover {
+        transform: scale(1.02);
+    }
+
+    .product-card::before {
+        content: "";
+        position: absolute;
+        top: -2px;
+        left: -2px;
+        width: calc(100% + 4px);
+        height: calc(100% + 4px);
+        background: linear-gradient(270deg, #ffd814, #fb641b, #a9e4e5, #ffd814);
+        background-size: 600% 600%;
+        z-index: 1;
+        animation: borderRun 2s linear infinite;
+        border-radius: 12px;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .product-card:hover::before {
+        opacity: 1;
+    }
+
+    .product-card * {
+        position: relative;
+        z-index: 2;
+    }
+
+    .product-card a {
+        text-decoration: none;
+        color: inherit;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+
+    @keyframes borderRun {
+        0% { background-position: 0% 50%; }
+        100% { background-position: 100% 50%; }
+    }
+
+    .product-card .product-image img { /* specific for product cards in grid */
+        width: 100%;
+        height: 130px; /* Slightly smaller height for grid view */
+        object-fit: contain;
+        border-radius: 8px;
+        background-color: #e9ecef;
+        padding: 8px; /* Slightly less padding */
+        margin-bottom: 10px;
+    }
+
+    .product-card .product-description {
+        flex-grow: 1; /* Allows description to take available space */
+        display: flex;
+        flex-direction: column;
+    }
+
+    .product-card .product-description h5 {
+        color: #f8f9fa;
+        font-weight: 700;
+        font-size: 1.15rem; /* Adjusted font size */
+        margin-bottom: 8px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .product-card .product-description p {
+    font-size: 0.85rem;
+    margin-bottom: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2; /* ✅ Standard property for future compatibility */
+    line-height: 1.4;
+}
+
+    .product-card .product-description strong {
+        color: #ffd814;
+        font-size: 1.0rem; /* Adjusted font size */
+        margin-top: auto; /* Pushes price to the bottom */
+    }
+    .product-card .product-description .stock-status {
+        color: #ff6b6b !important;
+        font-size: 0.85rem;
+        font-weight: bold;
+        margin-top: 5px; /* Space after price */
+    }
+
+    /* Back button positioning */
+    .back-button-container {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+    }
+    .back-button-container .btn {
+      background-color: #00ffcc;
+      border-color: #00ffcc;
+      color: #021718cc;
+      font-weight: bold;
+      border-radius: 8px;
+      padding: 8px 15px;
+      transition: background-color 0.3s ease, transform 0.2s ease;
+    }
+    .back-button-container .btn:hover {
+      background-color: #00e6b8;
+      border-color: #00e6b8;
+      transform: translateY(-2px);
+    }
+    
+    @media (max-width: 768px) {
+        .product-container {
+            padding: 15px;
+            max-width: 95%; /* Adjust for smaller screens */
+        }
+        .product-details h2 {
+            font-size: 1.8rem;
+        }
+        .product-details .price {
+            font-size: 1.5rem;
+        }
+        .btn-group .btn {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        .similar-products-section {
+            padding: 10px;
+        }
+        .similar-products-section h3 {
+            font-size: 1.8rem;
+        }
+        /* Mobile-specific grid for similar products - forces 2 columns */
+        .similar-products-grid {
+            grid-template-columns: 1fr 1fr !important; /* Forces two columns on mobile, matching homepage */
+            gap: 15px;
+        }
+        .product-card {
+            height: 350px; /* Adjust card height for mobile */
+            padding: 15px;
+        }
+        .product-card .product-image img {
+            height: 100px; /* Adjust image height for mobile cards */
+        }
+        .product-card .product-description h5 {
+            font-size: 1rem;
+        }
+        .product-card .product-description p {
+            font-size: 0.8rem;
+        }
+        .product-card .product-description strong {
+            font-size: 0.9rem;
+        }
+        .product-card .product-description .stock-status {
+            font-size: 0.75rem;
+        }
+    }
+    
+    /* Further adjustment for very small mobile screens if needed, e.g., below 400px */
+    @media (max-width: 450px) {
+        .similar-products-grid {
+            grid-template-columns: 1fr 1fr !important; /* Keep two columns */
+            gap: 10px; /* Reduce gap */
+        }
+        .product-card {
+            height: 320px; /* Further reduce card height */
+            padding: 10px;
+        }
+        .product-card .product-image img {
+            height: 90px;
+        }
+        .product-card .product-description h5 {
+            font-size: 0.9rem;
+        }
+        .product-card .product-description p {
+            font-size: 0.75rem;
+        }
+        .product-card .product-description strong {
+            font-size: 0.85rem;
+        }
+    }
+  </style>
+</head>
+<body>
+  <div class="back-button-container">
+    <button class="btn btn-primary" onclick="window.history.back()">← Back to Products</button>
+  </div>
+
+  <div class="product-container">
+    <div class="row">
+      <div class="col-md-6 text-center product-image">
+        <img id="productImage" src="placeholder.jpg" alt="Product Image" class="img-fluid rounded" />
+      </div>
+      <div class="col-md-6 product-details">
+        <h2 id="productName">Product Name</h2>
+        <p id="productDescription">Product Description</p>
+        <p class="price" id="productPrice">₹0.00</p>
+        <p class="stock" id="productStock">In Stock: 0</p>
+        <div class="btn-group w-100" role="group">
+          <button id="addToCartBtn" class="btn btn-action me-2">Add to Cart</button>
+          <button id="buyNowBtn" class="btn btn-outline-secondary">Buy Now</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="similar-products-section">
+    <h3>You Might Also Like</h3>
+    <div id="similarProductsGrid" class="similar-products-grid">
+      </div>
+    <div id="noSimilarProducts" class="text-center text-white-50 mt-4" style="display:none;">
+      No similar products found in this category.
+    </div>
+  </div>
+
+  <script>
+    const supabaseUrl = 'https://btpwxtvrhtfvdyadzbyx.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0cHd4dHZyaHRmdmR5YWR6Ynl4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA0MTk3NTksImV4cCI6MjA2NTk5NTc1OX0.MJ4yZ0DtfB05tDlJTJdtvwppPcSAGCX5Y9si3dNJkSE';
+    const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+    let productDetails = {}; // Store product details globally
+
+    async function loadProductDetails() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const productId = urlParams.get('id');
+
+      if (!productId) {
+        document.getElementById('productName').innerText = 'Product Not Found';
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('products')
+        .select('*') // Select all columns, including categories
+        .eq('id', productId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching product details:', error.message);
+        document.getElementById('productName').innerText = 'Error loading product.';
+        return;
+      }
+
+      if (data) {
+        productDetails = data; // Assign fetched data to global variable
+        document.getElementById('productImage').src = data.img;
+        document.getElementById('productName').innerText = data.name;
+        document.getElementById('productDescription').innerText = data.description;
+        document.getElementById('productPrice').innerText = `₹${data.price.toFixed(2)}`;
+        
+        // Update stock display and button states
+        if (data.stock <= 0) {
+          document.getElementById('addToCartBtn').disabled = true;
+          document.getElementById('buyNowBtn').disabled = true;
+          document.getElementById('productStock').classList.add('text-danger');
+          document.getElementById('productStock').innerText = 'Out of Stock';
+        } else {
+          document.getElementById('addToCartBtn').disabled = false;
+          document.getElementById('buyNowBtn').disabled = false;
+          document.getElementById('productStock').classList.remove('text-danger');
+          document.getElementById('productStock').innerText = `In Stock: ${data.stock}`;
+        }
+
+        // Load similar products based on categories
+        if (data.categories && data.categories.length > 0) {
+            loadSimilarProducts(data.categories, data.id); // Pass current product ID to exclude it
+        } else {
+            document.getElementById('similarProductsGrid').style.display = 'none';
+            document.getElementById('noSimilarProducts').style.display = 'block';
+        }
+      } else {
+        document.getElementById('productName').innerText = 'Product Not Found';
+      }
+    }
+
+    async function loadSimilarProducts(categories, currentProductId) {
+        const similarProductsGrid = document.getElementById('similarProductsGrid');
+        const noSimilarProducts = document.getElementById('noSimilarProducts');
+
+        // Fetch products that contain any of the given categories, excluding the current product
+        const { data: similarProducts, error } = await supabase
+            .from('products')
+            .select('*')
+            .not('id', 'eq', currentProductId) // Exclude the current product
+            .contains('categories', categories) // Products must contain at least one of these categories
+            .limit(4); // Limit to a reasonable number of suggestions
+
+        if (error) {
+            console.error('Error fetching similar products:', error.message);
+            similarProductsGrid.innerHTML = '';
+            noSimilarProducts.style.display = 'block';
+            return;
+        }
+
+        if (similarProducts && similarProducts.length > 0) {
+            similarProductsGrid.innerHTML = ''; // Clear previous content
+            similarProducts.forEach(product => {
+                const card = document.createElement('div');
+                card.className = 'product-card';
+                // Use a proper link for navigation to product details page
+                card.innerHTML = `
+                    <a href="product_details.html?id=${product.id}">
+                        <div class="product-image text-center">
+                            <img src="${product.img}" alt="${product.name}" />
+                        </div>
+                        <div class="product-description">
+                            <h5 class="fw-bold">${product.name}</h5>
+                            <p>${product.description}</p>
+                            <strong>₹${product.price}</strong>
+                            <p class="stock-status">${product.stock > 0 ? `In Stock: ${product.stock}` : 'Out of Stock'}</p>
+                        </div>
+                    </a>
+                `;
+                similarProductsGrid.appendChild(card);
+            });
+            noSimilarProducts.style.display = 'none';
+        } else {
+            similarProductsGrid.innerHTML = '';
+            noSimilarProducts.style.display = 'block';
+        }
+    }
+
+
+    async function addToCart() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert("Please login to add items to cart.");
+        window.location.href = "auth.html";
+        return;
+      }
+
+      if (!productDetails.id) {
+        alert("Product details not loaded. Please try again.");
+        return;
+      }
+      
+      // Check if product is already in cart for this user
+      const { data: existingCartItem, error: checkError } = await supabase
+        .from('cart')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('product_id', productDetails.id)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 means no rows found
+        alert("Error checking cart: " + checkError.message);
+        return;
+      }
+
+      if (existingCartItem) {
+        alert("Product is already in your cart!");
+        window.location.href = "cart.html";
+        return;
+      }
+
+      const cartItem = {
+        user_id: user.id,
+        product_id: productDetails.id,
+        image_url: productDetails.img,
+        name: productDetails.name,
+        description: productDetails.description,
+        price: productDetails.price,
+        quantity: 1
+      };
+
+      const { error: insertError } = await supabase.from("cart").insert([cartItem]);
+
+      if (insertError) {
+        alert("Error adding to cart: " + insertError.message);
+      } else {
+        alert("Added to cart!");
+        window.location.href = "cart.html";
+      }
+    }
+
+    async function buyNow() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert("Please login to continue.");
+        window.location.href = "auth.html";
+        return;
+      }
+
+      if (!productDetails.id) {
+        alert("Product details not loaded. Please try again.");
+        return;
+      }
+
+      // Pass all necessary product details to the place_order page
+      window.location.href = `place_order.html?id=${productDetails.id}&img=${encodeURIComponent(productDetails.img)}&name=${encodeURIComponent(productDetails.name)}&price=${encodeURIComponent(productDetails.price)}&quantity=1`;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadProductDetails();
+      document.getElementById('addToCartBtn').addEventListener('click', addToCart);
+      document.getElementById('buyNowBtn').addEventListener('click', buyNow);
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

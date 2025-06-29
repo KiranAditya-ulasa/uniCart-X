@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Orders - UniCartX / AniWaker</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+    <style>
+        body {
+            background-color: #f0f2f5;
+            font-family: Arial, sans-serif;
+            color: #333; /* Default text color from orders.html */
+        }
+        .order-container {
+            max-width: 900px;
+            margin: 40px auto;
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 0 12px rgba(0,0,0,0.1);
+        }
+        .order-card {
+            border-bottom: 1px solid #ddd;
+            padding: 20px 0;
+            display: flex;
+            gap: 20px;
+            align-items: flex-start; /* Align items to the top to prevent image pushing content down */
+            flex-wrap: wrap; /* Allow wrapping on smaller screens (from orders.html) */
+        }
+        .order-card:last-child {
+            border-bottom: none; /* No border for the last item */
+        }
+        /* Product image style from orders.html, slightly adjusted to blend with orders1.html's 100px size */
+        .product-image-small { /* Renamed from orders1.html's general img selector to avoid conflict */
+            width: 80px; /* Kept 80px as per orders.html for consistency with its usage */
+            height: 80px;
+            object-fit: cover;
+            border-radius: 8px;
+            flex-shrink: 0; /* Prevent image from shrinking */
+        }
+        /* orders1.html's image size was 100px, orders.html used 80px. Stick to orders.html's styling for product-image-small */
+        .order-details { /* From orders.html */
+            flex-grow: 1; /* Allow details to take available space */
+        }
+        .order-details h5 { /* From orders.html */
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .order-details p { /* From orders.html */
+            margin-bottom: 3px;
+            font-size: 0.95rem;
+            color: #555;
+        }
+        .order-actions {
+            display: flex;
+            flex-direction: column; /* Column layout from orders.html */
+            gap: 10px; /* Gap from orders.html */
+            align-items: flex-end; /* Align to end from orders.html */
+            justify-content: flex-start;
+            flex-shrink: 0; /* Prevent actions from shrinking */
+        }
+        .order-actions .btn { /* From orders.html */
+            font-size: 0.9rem;
+            padding: 8px 15px;
+        }
+
+        /* Status colors from orders.html */
+        .status-pending { color: #0dcaf0; } /* Info blue */
+        .status-packed { color: #0d6efd; } /* Primary blue */
+        .status-shipped { color: #6f42c1; } /* Purple */
+        .status-out_for_delivery { color: #20c997; } /* Teal */
+        .status-delivered { color: #198754; } /* Success green */
+        .status-return-requested { color: #ffc107; } /* Warning yellow */
+        .status-returned { color: #fd7e14; } /* Orange */
+        .status-cancelled { color: #dc3545; } /* Danger red */
+
+        /* Custom Status Colors for Badges from orders1.html */
+        .status-badge {
+            font-size: 0.85rem;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-weight: bold;
+            color: white; /* Ensure text is white for badges */
+        }
+        .status-badge.status-pending { background-color: #0dcaf0; } /* Bootstrap info */
+        .status-badge.status-packed { background-color: #0d6efd; } /* Bootstrap primary */
+        .status-badge.status-shipped { background-color: #6f42c1; } /* Purple */
+        .status-badge.status-out_for_delivery { background-color: #20c997; } /* Bootstrap teal */
+        .status-badge.status-delivered { background-color: #198754; } /* Bootstrap success */
+        .status-badge.status-return_requested { background-color: #ffc107; } /* Bootstrap warning */
+        .status-badge.status-returned { background-color: #fd7e14; } /* Bootstrap orange */
+        .status-badge.status-cancelled { background-color: #dc3545; } /* Bootstrap danger */
+
+
+        /* Responsive adjustments from orders.html */
+        @media (max-width: 768px) {
+            .order-card {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }
+            .order-actions {
+                width: 100%;
+                flex-direction: row;
+                justify-content: center;
+                margin-top: 15px;
+            }
+        }
+        @media (max-width: 576px) {
+            .order-container {
+                margin: 20px auto;
+                padding: 15px;
+            }
+            .order-card {
+                padding: 15px 0;
+            }
+        }
+
+        /* Custom styles for star rating in modal (from orders.html) */
+        .star-rating {
+            display: inline-block;
+            font-size: 0; /* Remove space between inline-block elements */
+            direction: rtl; /* For right-to-left star display (5 on left) */
+        }
+        .star-rating input {
+            display: none;
+        }
+        .star-rating label {
+            font-size: 2.5rem; /* Size of the stars */
+            color: #ccc; /* Default star color */
+            cursor: pointer;
+            padding: 0 5px;
+            transition: color 0.2s;
+        }
+        .star-rating label:before {
+            content: '★';
+        }
+        .star-rating input:checked ~ label {
+            color: #ffc107; /* Gold color for checked stars */
+        }
+        .star-rating label:hover,
+        .star-rating label:hover ~ label {
+            color: #ffdb58; /* Lighter gold on hover */
+        }
+        /* Ensure checked stars remain gold when hovering on others */
+        .star-rating input:checked + label:hover,
+        .star-rating input:checked + label:hover ~ label,
+        .star-rating input:checked ~ label:hover,
+        .star-rating input:checked ~ label:hover ~ label {
+            color: #ffdb58;
+        }
+
+        /* Styles for the Status Tracking Line (from orders1.html) */
+        .status-track-line {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            margin-bottom: 25px; /* More space for labels */
+            position: relative;
+            height: 20px; /* Base height for the line */
+        }
+        .status-track-line::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background-color: #e0e0e0;
+            z-index: 0;
+        }
+        .status-point {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background-color: #e0e0e0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.7em; /* Keep font small inside point if needed */
+            color: white;
+            z-index: 1;
+            position: relative;
+        }
+        .status-point.active {
+            background-color: #0d6efd; /* Active blue */
+            box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.25); /* Glow for active */
+        }
+        .status-point.completed {
+            background-color: #198754; /* Completed green */
+        }
+        .status-label {
+            position: absolute;
+            top: 25px; /* Position below the point */
+            font-size: 0.75em;
+            color: #555;
+            text-align: center;
+            white-space: nowrap;
+            transform: translateX(-50%); /* Center label horizontally */
+            left: 50%; /* Start positioning from center of the point */
+        }
+        /* Specific label adjustments if needed for overlap */
+        .point-0 .status-label { transform: translateX(-50%); }
+        .point-1 .status-label { transform: translateX(-50%); }
+        .point-2 .status-label { transform: translateX(-50%); }
+        .point-3 .status-label { transform: translateX(-50%); }
+        .point-4 .status-label { transform: translateX(-50%); }
+
+        /* Media query for smaller screens to prevent label overlap */
+        @media (max-width: 768px) {
+            .status-track-line {
+                height: 45px; /* Increase height for stacked labels */
+                margin-bottom: 30px;
+            }
+            .status-label {
+                top: 20px; /* Adjust top for smaller points */
+                font-size: 0.65em;
+            }
+            /* More aggressive centering/offset for very small screens if labels still overlap */
+             .point-0 .status-label { left: 0%; transform: translateX(-10%); } /* Shift first left */
+             .point-4 .status-label { left: 100%; transform: translateX(-90%); } /* Shift last right */
+        }
+
+       /* Updated "Heartbeat" Blink Animation (from orders1.html) */
+       @keyframes heartbeat {
+            0% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(13, 110, 253, 0.4); /* Start with a subtle inner glow */
+            }
+            50% {
+                transform: scale(1.1); /* Larger pulse */
+                box-shadow: 0 0 0 8px rgba(13, 110, 253, 0); /* Expand and fade out the shadow */
+            }
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(13, 110, 253, 0); /* Back to normal, shadow gone */
+            }
+        }
+
+        .blink-status {
+            animation: heartbeat 1.5s ease-in-out infinite; /* Continuous heartbeat */
+            display: inline-block; /* Ensure transform applies */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container order-container">
+        <h3 class="mb-4 text-center">🛒 Your Orders</h3>
+        <div id="ordersList">
+            <p class="text-center text-muted">Loading your orders...</p>
+        </div>
+        <p id="noOrdersMessage" class="text-center text-muted" style="display: none;">You haven't placed any orders yet.</p>
+    </div>
+
+    <div class="modal fade" id="feedbackModal" tabindex="-1" aria-labelledby="feedbackModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="feedbackModalLabel">Provide Feedback</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-center">How would you rate <strong id="feedbackProductName"></strong>?</p>
+                    <div class="text-center mb-3">
+                        <img id="feedbackProductImage" src="" alt="Product Image" style="max-width: 100px; max-height: 100px; border-radius: 8px;">
+                    </div>
+                    <div class="star-rating mb-3 text-center">
+                        <input type="radio" id="star5" name="rating" value="5" /><label for="star5" title="5 stars"></label>
+                        <input type="radio" id="star4" name="rating" value="4" /><label for="star4" title="4 stars"></label>
+                        <input type="radio" id="star3" name="rating" value="3" /><label for="star3" title="3 stars"></label>
+                        <input type="radio" id="star2" name="rating" value="2" /><label for="star2" title="2 stars"></label>
+                        <input type="radio" id="star1" name="rating" value="1" /><label for="star1" title="1 star"></label>
+                    </div>
+                    <div class="form-floating">
+                        <textarea class="form-control" placeholder="Leave your feedback here" id="feedbackDescription" style="height: 100px"></textarea>
+                        <label for="feedbackDescription">Your Feedback</label>
+                    </div>
+                    <input type="hidden" id="feedbackOrderId">
+                    <input type="hidden" id="feedbackProductId">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="submitFeedback()">Submit Feedback</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const supabaseUrl = 'https://btpwxtvrhtfvdyadzbyx.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0cHd4dHZyaHRmdmR5YWR6Ynl4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA0MTk3NTksImV4cCI6MjA2NTk5NTc1OX0.MJ4yZ0DtfB05tDlJTJdtvwppPcSAGCX5Y9si3dNJkSE';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        // Define the sequence of status steps for tracking line (from orders1.html)
+        const STATUS_TRACK_STEPS = ['pending', 'packed', 'shipped', 'out_for_delivery', 'delivered'];
+
+        // Map database status names to user-friendly display names (from orders1.html)
+        const STATUS_DISPLAY_NAMES = {
+            'pending': 'Pending',
+            'packed': 'Packed',
+            'shipped': 'Shipped',
+            'out_for_delivery': 'Out for Delivery',
+            'delivered': 'Delivered',
+            'return_requested': 'Return Requested',
+            'returned': 'Returned',
+            'cancelled': 'Cancelled'
+        };
+
+        // --- Local Storage for Blink Effect (from orders1.html) ---
+        // Function to get last viewed statuses from localStorage
+        function getLastViewedStatuses() {
+            try {
+                const stored = localStorage.getItem('lastViewedOrderStatuses');
+                return stored ? JSON.parse(stored) : {};
+            } catch (e) {
+                console.error("Error parsing lastViewedOrderStatuses from localStorage", e);
+                return {};
+            }
+        }
+
+        // Function to save current statuses to localStorage
+        function saveCurrentStatuses(statuses) {
+            localStorage.setItem('lastViewedOrderStatuses', JSON.stringify(statuses));
+        }
+        // --- End Local Storage for Blink Effect ---
+
+        async function loadOrders() {
+            const { data: { user }, error: userError } = await supabase.auth.getUser(); // orders.html's user fetching
+            const ordersList = document.getElementById('ordersList');
+            const noOrdersMessage = document.getElementById('noOrdersMessage');
+
+            if (userError || !user) {
+                alert("Please log in to view your orders.");
+                window.location.href = "auth.html"; // Redirect from orders.html
+                ordersList.innerHTML = ''; // Clear loading message
+                noOrdersMessage.style.display = 'block'; // Show no orders message if not logged in
+                noOrdersMessage.textContent = 'Please log in to view your orders.';
+                return;
+            }
+
+            ordersList.innerHTML = '<p class="text-center text-muted">Loading your orders...</p>';
+            noOrdersMessage.style.display = 'none';
+
+            const { data: orders, error } = await supabase
+                .from('orders')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                ordersList.innerHTML = `<p class="text-center text-danger">Error loading orders: ${error.message}</p>`;
+                console.error("Error fetching orders:", error);
+                return;
+            }
+
+            if (!orders || orders.length === 0) {
+                ordersList.innerHTML = ''; // Clear loading message
+                noOrdersMessage.style.display = 'block';
+                noOrdersMessage.textContent = 'You have no orders yet.';
+                return;
+            }
+
+            const lastViewedStatuses = getLastViewedStatuses(); // from orders1.html
+            const currentStatuses = {}; // To store statuses for saving after rendering
+
+            ordersList.innerHTML = ''; // Clear loading message
+
+            for (const order of orders) {
+                let productName = 'Unknown Product';
+                let productImage = 'https://via.placeholder.com/80'; // Placeholder image
+                let productPrice = order.total_price / order.quantity; // Default calculation
+
+                // orders1.html implies product_name, product_img, product_price on order object directly.
+                // orders.html fetches it from 'products' table.
+                // Prioritize fetching from 'products' for robustness, but use order data if available.
+                const { data: product, error: productError } = await supabase
+                    .from('products')
+                    .select('name, img, price') // Added price from products table
+                    .eq('id', order.product_id)
+                    .single();
+
+                if (product && !productError) {
+                    productName = product.name;
+                    productImage = product.img;
+                    productPrice = product.price; // Use actual product price
+                } else {
+                    // Fallback to order details if product not found or error
+                    productName = order.product_name || 'Unknown Product';
+                    productImage = order.product_img || 'https://via.placeholder.com/80';
+                    productPrice = order.product_price || (order.total_price / order.quantity) || 'N/A'; // orders1.html has product_price
+                    if (productError && productError.code !== 'PGRST116') { // PGRST116 means "No rows found"
+                        console.error("Error fetching product details for order:", order.id, productError);
+                    }
+                }
+
+                const displayStatus = STATUS_DISPLAY_NAMES[order.status] || order.status; // from orders1.html
+                const statusClass = `status-${order.status.replace(/ /g, '_').toLowerCase()}`; // from orders1.html
+
+                // Store current status for later saving (from orders1.html)
+                currentStatuses[order.id] = order.status;
+
+                // Determine if this order item should blink (from orders1.html)
+                const shouldBlink = (
+                    ['packed', 'shipped', 'out_for_delivery'].includes(order.status) &&
+                    lastViewedStatuses[order.id] !== order.status
+                );
+                const blinkClass = shouldBlink ? 'blink-status' : '';
+
+                let trackingHtml = ''; // from orders1.html
+                if (STATUS_TRACK_STEPS.includes(order.status)) {
+                    const currentIndex = STATUS_TRACK_STEPS.indexOf(order.status);
+                    trackingHtml = `
+                        <div class="status-track-line">
+                            ${STATUS_TRACK_STEPS.map((step, index) => {
+                                const isCompleted = index < currentIndex;
+                                const isActive = index === currentIndex;
+                                return `
+                                    <div class="status-point ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''} point-${index}">
+                                        <span class="status-label">${STATUS_DISPLAY_NAMES[step]}</span>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    `;
+                }
+
+                let actionButtons = '';
+                let feedbackButton = ''; // from orders.html
+
+                // Check for existing review (from orders.html)
+                const { data: existingReview, error: reviewError } = await supabase
+                    .from('product_reviews')
+                    .select('id')
+                    .eq('order_id', order.id)
+                    .eq('product_id', order.product_id)
+                    .eq('user_id', user.id)
+                    .single();
+
+                if (reviewError && reviewError.code !== 'PGRST116') {
+                    console.error("Error checking for existing review:", reviewError);
+                }
+
+                if (order.status === 'pending' || order.status === 'packed' || order.status === 'shipped' || order.status === 'out_for_delivery') {
+                    actionButtons = `<button class="btn btn-danger" onclick="cancelOrder('${order.id}')">Cancel Order</button>`;
+                } else if (order.status === 'delivered') {
+                    actionButtons = `<button class="btn btn-info" onclick="requestReturn('${order.id}')">Request Return</button>`;
+                    if (!existingReview) {
+                        feedbackButton = `
+                            <button class="btn btn-success mt-2"
+                                data-bs-toggle="modal" data-bs-target="#feedbackModal"
+                                onclick="openFeedbackModal('${order.id}', '${order.product_id}', '${productName}', '${productImage}')">
+                                Give Feedback
+                            </button>
+                        `;
+                    } else {
+                        feedbackButton = `<button class="btn btn-secondary mt-2" disabled>Feedback Submitted</button>`;
+                    }
+                } else if (order.status === 'return_requested' || order.status === 'returned' || order.status === 'cancelled') {
+                    actionButtons = `<button class="btn btn-secondary" disabled>${order.status.replace(/_/g, ' ')}</button>`;
+                }
+
+
+                const orderCard = document.createElement('div');
+                orderCard.className = 'order-card';
+                orderCard.innerHTML = `
+                    <img src="${productImage}" alt="${productName}" class="product-image-small">
+                    <div class="order-details">
+                        <h5>${productName}</h5>
+                        <p>Order ID: ${order.id}</p>
+                        <p>Quantity: ${order.quantity} | Price: ₹${productPrice}</p>
+                        <p>Total: ₹${order.total_price}</p>
+                        <p>Order Date: ${new Date(order.created_at).toLocaleDateString()}</p>
+
+                        ${trackingHtml} <p>Status: <span class="status-${order.status.replace(/ /g, '_')} status-badge ${blinkClass}">${displayStatus.toUpperCase()}</span></p>
+
+                        <div class="order-actions">
+                            ${actionButtons}
+                            ${feedbackButton}
+                        </div>
+                    </div>
+                `;
+                ordersList.appendChild(orderCard);
+            }
+
+            // After rendering, save the current statuses to localStorage (from orders1.html)
+            saveCurrentStatuses(currentStatuses);
+        }
+
+        async function cancelOrder(orderId) {
+            if (!confirm("Are you sure you want to cancel this order?")) {
+                return;
+            }
+
+            const { data: orderToCancel, error: fetchError } = await supabase
+                .from('orders')
+                .select('*')
+                .eq('id', orderId)
+                .single();
+
+            if (fetchError) {
+                alert('Error fetching order details: ' + fetchError.message);
+                return;
+            }
+
+            // Prevent cancellation if already in a final or return state (from orders.html and improved)
+            const nonCancellableStatuses = ['delivered', 'returned', 'cancelled', 'return_requested'];
+            if (nonCancellableStatuses.includes(orderToCancel.status)) {
+                alert("This order cannot be cancelled as its status is already " + (STATUS_DISPLAY_NAMES[orderToCancel.status] || orderToCancel.status) + ".");
+                return;
+            }
+
+            // Update order status to 'cancelled'
+            const { error: updateError } = await supabase
+                .from('orders')
+                .update({ status: 'cancelled' })
+                .eq('id', orderId);
+
+            if (updateError) {
+                alert('Error cancelling order: ' + updateError.message);
+            } else {
+                // Revert stock only if the order was not already delivered or returned
+                const { data: product, error: productFetchError } = await supabase
+                    .from('products')
+                    .select('stock')
+                    .eq('id', orderToCancel.product_id)
+                    .single();
+
+                if (productFetchError) {
+                    console.error('Error fetching product stock for cancellation:', productFetchError.message);
+                } else if (product) {
+                    const { error: stockUpdateError } = await supabase
+                        .from('products')
+                        .update({ stock: product.stock + orderToCancel.quantity })
+                        .eq('id', orderToCancel.product_id);
+
+                    if (stockUpdateError) {
+                        console.error('Error reverting stock after cancellation:', stockUpdateError.message);
+                    } else {
+                        console.log('Stock reverted successfully for cancelled order.');
+                    }
+                }
+                alert('Order cancelled successfully.');
+                loadOrders(); // Reload orders to update status
+            }
+        }
+
+        async function requestReturn(orderId) {
+            if (!confirm("Are you sure you want to request a return for this order?")) {
+                return;
+            }
+
+            const { data: orderToReturn, error: fetchError } = await supabase
+                .from('orders')
+                .select('*')
+                .eq('id', orderId)
+                .single();
+
+            if (fetchError) {
+                alert('Error fetching order details: ' + fetchError.message);
+                return;
+            }
+
+            if (orderToReturn.status !== 'delivered') {
+                alert('Only delivered orders can be returned.');
+                return;
+            }
+
+            const { error: updateError } = await supabase
+                .from('orders')
+                .update({ status: 'return_requested' })
+                .eq('id', orderId);
+
+            if (updateError) {
+                alert('Error requesting return: ' + updateError.message);
+            } else {
+                alert('Return request submitted successfully. Please wait for admin approval.');
+                loadOrders(); // Reload orders to update status
+            }
+        }
+
+        // Functions for Feedback Modal (from orders.html)
+        function openFeedbackModal(orderId, productId, productName, productImage) {
+            document.getElementById('feedbackOrderId').value = orderId;
+            document.getElementById('feedbackProductId').value = productId;
+            document.getElementById('feedbackProductName').innerText = productName;
+            document.getElementById('feedbackProductImage').src = productImage;
+            // Clear previous rating and description
+            document.querySelectorAll('input[name="rating"]').forEach(radio => radio.checked = false);
+            document.getElementById('feedbackDescription').value = '';
+        }
+
+        async function submitFeedback() {
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+            if (userError || !user) {
+                alert("Please log in to submit feedback.");
+                return;;
+            }
+
+            const orderId = document.getElementById('feedbackOrderId').value;
+            const productId = document.getElementById('feedbackProductId').value;
+            const rating = document.querySelector('input[name="rating"]:checked')?.value;
+            const reviewText = document.getElementById('feedbackDescription').value.trim();
+
+            if (!rating) {
+                alert("Please select a star rating.");
+                return;
+            }
+
+            if (!reviewText) {
+                alert("Please provide a description for your feedback.");
+                return;
+            }
+
+            // Insert feedback into product_reviews table
+            const { error: insertError } = await supabase
+                .from('product_reviews')
+                .insert([
+                    {
+                        user_id: user.id,
+                        product_id: productId,
+                        order_id: orderId,
+                        rating: parseInt(rating),
+                        review_text: reviewText
+                    }
+                ]);
+
+            if (insertError) {
+                alert("Error submitting feedback: " + insertError.message);
+                console.error("Feedback submission error:", insertError);
+            } else {
+                alert("Thank you for your feedback!");
+                const feedbackModal = bootstrap.Modal.getInstance(document.getElementById('feedbackModal'));
+                if (feedbackModal) {
+                    feedbackModal.hide();
+                }
+                loadOrders(); // Reload orders to update the feedback button status
+            }
+        }
+
+        // Initial load of orders when the page is ready
+        document.addEventListener('DOMContentLoaded', loadOrders);
+    </script>
+
+</body>
+</html>

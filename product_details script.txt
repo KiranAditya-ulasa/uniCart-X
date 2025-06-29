@@ -1,0 +1,81 @@
+  <!-- <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script>
+   const params = new URLSearchParams(window.location.search);
+const productId = params.get("id");
+
+async function loadProductDetails() {
+  if (!productId) {
+    document.querySelector('.product-container').innerHTML = "<h2>Product not found.</h2>";
+    return;
+  }
+
+  const { data: product, error } = await supabase
+    .from("products")
+    .select("*")
+    .eq("id", productId)
+    .single();
+
+  if (error || !product) {
+    document.querySelector('.product-container').innerHTML = "<h2>Failed to load product.</h2>";
+    return;
+  }
+
+  document.getElementById("displayedImage").src = product.img;
+  document.getElementById("description").innerHTML = `
+    <h4 class="fw-bold">${product.name}</h4>
+    <p>${product.description}</p>
+    <p><strong>₹${product.price}</strong></p>
+  `;
+
+  window.selectedProduct = product;
+}
+
+loadProductDetails();
+
+
+    
+    const supabaseUrl = 'https://btpwxtvrhtfvdyadzbyx.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0cHd4dHZyaHRmdmR5YWR6Ynl4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA0MTk3NTksImV4cCI6MjA2NTk5NTc1OX0.MJ4yZ0DtfB05tDlJTJdtvwppPcSAGCX5Y9si3dNJkSE';
+    const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+  // const supabase = supabase.createClient('YOUR_SUPABASE_URL', 'YOUR_SUPABASE_ANON_KEY');
+
+ async function addToCart() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    alert("Please login to add to cart.");
+    window.location.href = "auth.html";
+    return;
+  }
+
+  const { error } = await supabase.from("cart").insert([{
+    user_id: user.id,
+    product_id: window.selectedProduct.id
+  }]);
+
+  if (error) {
+    alert("Error adding to cart: " + error.message);
+  } else {
+    alert("✅ Added to cart!");
+    window.location.href = "cart.html";
+  }
+}
+
+async function buyNow() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    alert("Please login to continue.");
+    window.location.href = "auth.html";
+    return;
+  }
+
+  const p = window.selectedProduct;
+  window.location.href = `place_order.html?img=${encodeURIComponent(p.img)}&name=${encodeURIComponent(p.name)}&price=${encodeURIComponent(p.price)}&id=${p.id}`;
+}
+
+
+
+    function buyNow(img, name, price, id) {
+  window.location.href = `place_order.html?img=${encodeURIComponent(img)}&name=${encodeURIComponent(name)}&price=${encodeURIComponent(price)}&id=${id}`;
+}
+
+  </script> -->
