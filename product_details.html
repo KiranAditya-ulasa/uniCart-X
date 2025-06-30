@@ -66,6 +66,13 @@
       margin-bottom: 15px;
     }
 
+    /* New style for average review in main details */
+    .product-details .average-review {
+        font-size: 1rem;
+        color: #a9e4e5; /* A subtle color for reviews */
+        margin-bottom: 10px; /* Space between price and reviews */
+    }
+
     .product-details .stock {
       font-size: 0.95rem;
       color: #ff6b6b; /* Danger color for out of stock */
@@ -150,29 +157,11 @@
     }
 
     .product-card:hover {
-        transform: scale(1.02);
+        transform: scale(1.06);
     }
 
-    .product-card::before {
-        content: "";
-        position: absolute;
-        top: -2px;
-        left: -2px;
-        width: calc(100% + 4px);
-        height: calc(100% + 4px);
-        background: linear-gradient(270deg, #ffd814, #fb641b, #a9e4e5, #ffd814);
-        background-size: 600% 600%;
-        z-index: 1;
-        animation: borderRun 2s linear infinite;
-        border-radius: 12px;
-        pointer-events: none;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-    }
-
-    .product-card:hover::before {
-        opacity: 1;
-    }
+    /* Removed the ::before pseudo-element for the color hover effect */
+    /* Removed @keyframes borderRun */
 
     .product-card * {
         position: relative;
@@ -185,11 +174,6 @@
         display: flex;
         flex-direction: column;
         height: 100%;
-    }
-
-    @keyframes borderRun {
-        0% { background-position: 0% 50%; }
-        100% { background-position: 100% 50%; }
     }
 
     .product-card .product-image img { /* specific for product cards in grid */
@@ -240,6 +224,13 @@
         font-weight: bold;
         margin-top: 5px; /* Space after price */
     }
+    /* New style for average review in product cards */
+    .product-card .product-average-review {
+        font-size: 0.8rem;
+        color: #a9e4e5; /* A subtle color for reviews */
+        margin-bottom: 5px; /* Space between price and reviews */
+    }
+
 
     /* Back button positioning */
     .back-button-container {
@@ -349,7 +340,7 @@
         <h2 id="productName">Product Name</h2>
         <p id="productDescription">Product Description</p>
         <p class="price" id="productPrice">₹0.00</p>
-        <p class="stock" id="productStock">In Stock: 0</p>
+        <p class="average-review" id="productRating"></p> <p class="stock" id="productStock">In Stock: 0</p>
         <div class="btn-group w-100" role="group">
           <button id="addToCartBtn" class="btn btn-action me-2">Add to Cart</button>
           <button id="buyNowBtn" class="btn btn-outline-secondary">Buy Now</button>
@@ -373,6 +364,49 @@
     const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
     let productDetails = {}; // Store product details globally
+    let productRatings = {}; // Global object to store product ratings
+
+    // Helper function to generate star HTML based on average rating
+    function getStarRatingHtml(averageRating) {
+        if (averageRating === null || isNaN(averageRating)) {
+            return ''; // Return empty string if no valid rating
+        }
+        const fullStars = Math.round(averageRating); // Round to the nearest whole star
+        let stars = '';
+        for (let i = 0; i < fullStars; i++) {
+            stars += '⭐'; // Unicode star emoji
+        }
+        return stars;
+    }
+
+    // Function to fetch and process all product feedback (reused from index.html)
+    async function fetchAllProductRatings() {
+        const { data: feedback, error } = await supabase
+            .from('product_reviews')
+            .select('product_id, rating');
+
+        if (error) {
+            console.error('Error fetching all feedback:', error.message);
+            return;
+        }
+
+        const ratingsData = {};
+        feedback.forEach(item => {
+            if (!ratingsData[item.product_id]) {
+                ratingsData[item.product_id] = { sumStars: 0, count: 0 };
+            }
+            ratingsData[item.product_id].sumStars += item.rating;
+            ratingsData[item.product_id].count += 1;
+        });
+
+        for (const productId in ratingsData) {
+            productRatings[productId] = {
+                averageStars: ratingsData[productId].sumStars / ratingsData[productId].count,
+                ratingCount: ratingsData[productId].count
+            };
+        }
+    }
+
 
     async function loadProductDetails() {
       const urlParams = new URLSearchParams(window.location.search);
@@ -383,6 +417,7 @@
         return;
       }
 
+      // Fetch main product details
       const { data, error } = await supabase
         .from('products')
         .select('*') // Select all columns, including categories
@@ -402,6 +437,24 @@
         document.getElementById('productDescription').innerText = data.description;
         document.getElementById('productPrice').innerText = `₹${data.price.toFixed(2)}`;
         
+        // Fetch and display rating for the current product
+        const { data: productFeedback, error: feedbackError } = await supabase
+            .from('product_reviews')
+            .select('rating')
+            .eq('product_id', productId);
+
+        let averageRating = null;
+        let ratingCount = 0;
+        if (productFeedback && productFeedback.length > 0) {
+            ratingCount = productFeedback.length;
+            const totalRating = productFeedback.reduce((sum, item) => sum + item.rating, 0);
+            averageRating = totalRating / ratingCount;
+        }
+
+        const starsHtml = getStarRatingHtml(averageRating);
+        const ratingText = ratingCount > 0 ? `(${ratingCount} ratings)` : '(No ratings yet)';
+        document.getElementById('productRating').innerHTML = `${starsHtml} ${ratingText}`;
+
         // Update stock display and button states
         if (data.stock <= 0) {
           document.getElementById('addToCartBtn').disabled = true;
@@ -417,6 +470,8 @@
 
         // Load similar products based on categories
         if (data.categories && data.categories.length > 0) {
+            // Ensure all product ratings are fetched before loading similar products
+            await fetchAllProductRatings(); 
             loadSimilarProducts(data.categories, data.id); // Pass current product ID to exclude it
         } else {
             document.getElementById('similarProductsGrid').style.display = 'none';
@@ -449,6 +504,10 @@
         if (similarProducts && similarProducts.length > 0) {
             similarProductsGrid.innerHTML = ''; // Clear previous content
             similarProducts.forEach(product => {
+                const ratingInfo = productRatings[product.id] || { averageStars: null, ratingCount: 0 };
+                const starsHtml = getStarRatingHtml(ratingInfo.averageStars);
+                const ratingText = ratingInfo.ratingCount > 0 ? `(${ratingInfo.ratingCount} ratings)` : '(No ratings yet)';
+
                 const card = document.createElement('div');
                 card.className = 'product-card';
                 // Use a proper link for navigation to product details page
@@ -460,8 +519,8 @@
                         <div class="product-description">
                             <h5 class="fw-bold">${product.name}</h5>
                             <p>${product.description}</p>
-                            <strong>₹${product.price}</strong>
-                            <p class="stock-status">${product.stock > 0 ? `In Stock: ${product.stock}` : 'Out of Stock'}</p>
+                            <strong>₹${product.price.toFixed(2)}</strong>
+                            <p class="product-average-review">${starsHtml} ${ratingText}</p> <p class="stock-status">${product.stock > 0 ? `In Stock: ${product.stock}` : 'Out of Stock'}</p>
                         </div>
                     </a>
                 `;
