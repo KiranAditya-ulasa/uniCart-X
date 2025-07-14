@@ -187,7 +187,7 @@
             </div>
         </div>
         <table class="table table-bordered">
-            <thead><tr><th>Name</th><th>Mobile</th><th>Address</th><th>Product</th><th>Price</th><th>Image</th><th>Status</th><th>Action</th></tr></thead>
+            <thead><tr><th>Name</th><th>Mobile</th><th>Address</th><th>Product</th><th>Price</th><th>Quantity</th><th>Total Price</th><th>Image</th><th>Status</th><th>Action</th></tr></thead>
             <tbody id="orderList"></tbody>
         </table>
     </div>
@@ -542,7 +542,7 @@
     }
 
 
-    // --- Order Management (Modified to include sorting and filtering) ---
+    // --- Order Management (Modified to include sorting and filtering and quantity/total price) ---
     async function loadOrders() {
         const orderStatusFilter = document.getElementById("orderStatusFilter");
         const orderSortSelect = document.getElementById("orderSortSelect");
@@ -568,11 +568,12 @@
         const list = document.getElementById("orderList");
 
         if (error) {
-            list.innerHTML = `<tr><td colspan='8'>⚠️ ${error.message}</td></tr>`;
+            list.innerHTML = `<tr><td colspan='10'>⚠️ ${error.message}</td></tr>`; // Updated colspan
         } else {
             list.innerHTML = data.map(order => {
                 let statusDisplay = '';
                 let actionButtons = '';
+                const totalPrice = (parseFloat(order.product_price) * parseInt(order.quantity)).toFixed(2); // Calculate total price
 
                 switch (order.status) {
                     case 'pending':
@@ -619,7 +620,9 @@
                         <td>${order.mobile}</td>
                         <td>${order.address}</td>
                         <td class="order-product-name">${order.product_name}</td>
-                        <td>${order.product_price}</td>
+                        <td>₹${order.product_price}</td>
+                        <td>${order.quantity}</td>
+                        <td>₹${totalPrice}</td>
                         <td><img src="${order.product_img}" width="60"/></td>
                         <td class="order-status-text">${statusDisplay}</td>
                         <td>
@@ -628,7 +631,7 @@
                         </td>
                     </tr>
                 `;
-            }).join("") || "<tr><td colspan='8'>No orders.</td></tr>";
+            }).join("") || "<tr><td colspan='10'>No orders.</td></tr>"; // Updated colspan
         }
     }
 
