@@ -295,10 +295,10 @@
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0cHd4dHZyaHRmdmR5YWR6Ynl4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA0MTk3NTksImV4cCI6MjA2NTk5NTc1OX0.MJ4yZ0DtfB05tDlJTJdtvwppPcSAGCX5Y9si3dNJkSE';
         const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-        // Define the sequence of status steps for tracking line (from orders1.html)
+        // Define the sequence of status steps for tracking line
         const STATUS_TRACK_STEPS = ['pending', 'packed', 'shipped', 'out_for_delivery', 'delivered'];
 
-        // Map database status names to user-friendly display names (from orders1.html)
+        // Map database status names to user-friendly display names
         const STATUS_DISPLAY_NAMES = {
             'pending': 'Pending',
             'packed': 'Packed',
@@ -310,7 +310,7 @@
             'cancelled': 'Cancelled'
         };
 
-        // --- Local Storage for Blink Effect (from orders1.html) ---
+        // --- Local Storage for Blink Effect ---
         // Function to get last viewed statuses from localStorage
         function getLastViewedStatuses() {
             try {
@@ -329,15 +329,15 @@
         // --- End Local Storage for Blink Effect ---
 
         async function loadOrders() {
-            const { data: { user }, error: userError } = await supabase.auth.getUser(); // orders.html's user fetching
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
             const ordersList = document.getElementById('ordersList');
             const noOrdersMessage = document.getElementById('noOrdersMessage');
 
             if (userError || !user) {
                 alert("Please log in to view your orders.");
-                window.location.href = "auth.html"; // Redirect from orders.html
-                ordersList.innerHTML = ''; // Clear loading message
-                noOrdersMessage.style.display = 'block'; // Show no orders message if not logged in
+                window.location.href = "auth.html";
+                ordersList.innerHTML = '';
+                noOrdersMessage.style.display = 'block';
                 noOrdersMessage.textContent = 'Please log in to view your orders.';
                 return;
             }
@@ -358,28 +358,27 @@
             }
 
             if (!orders || orders.length === 0) {
-                ordersList.innerHTML = ''; // Clear loading message
+                ordersList.innerHTML = '';
                 noOrdersMessage.style.display = 'block';
                 noOrdersMessage.textContent = 'You have no orders yet.';
                 return;
             }
 
-            const lastViewedStatuses = getLastViewedStatuses(); // from orders1.html
-            const currentStatuses = {}; // To store statuses for saving after rendering
+            const lastViewedStatuses = getLastViewedStatuses();
+            const currentStatuses = {};
 
-            ordersList.innerHTML = ''; // Clear loading message
+            ordersList.innerHTML = '';
 
             for (const order of orders) {
                 let productName = 'Unknown Product';
                 let productImage = 'https://via.placeholder.com/80'; // Placeholder image
-                let productPrice = order.total_price / order.quantity; // Default calculation
+                let productPrice = 'N/A'; // Default placeholder
+                let totalPrice = 'N/A'; // Default placeholder
 
-                // orders1.html implies product_name, product_img, product_price on order object directly.
-                // orders.html fetches it from 'products' table.
                 // Prioritize fetching from 'products' for robustness, but use order data if available.
                 const { data: product, error: productError } = await supabase
                     .from('products')
-                    .select('name, img, price') // Added price from products table
+                    .select('name, img, price')
                     .eq('id', order.product_id)
                     .single();
 
@@ -391,26 +390,35 @@
                     // Fallback to order details if product not found or error
                     productName = order.product_name || 'Unknown Product';
                     productImage = order.product_img || 'https://via.placeholder.com/80';
-                    productPrice = order.product_price || (order.total_price / order.quantity) || 'N/A'; // orders1.html has product_price
+                    productPrice = order.product_price || 'N/A';
                     if (productError && productError.code !== 'PGRST116') { // PGRST116 means "No rows found"
                         console.error("Error fetching product details for order:", order.id, productError);
                     }
                 }
 
-                const displayStatus = STATUS_DISPLAY_NAMES[order.status] || order.status; // from orders1.html
-                const statusClass = `status-${order.status.replace(/ /g, '_').toLowerCase()}`; // from orders1.html
+                // Calculate total_price ensuring it's a number and fallback if order.total_price is undefined/null
+                totalPrice = (order.total_price !== undefined && order.total_price !== null) ? parseFloat(order.total_price) : (parseFloat(productPrice) * order.quantity);
+                if (isNaN(totalPrice)) {
+                    totalPrice = 'N/A'; // If calculation results in NaN, set to N/A
+                } else {
+                    totalPrice = totalPrice.toFixed(2); // Format to 2 decimal places
+                }
 
-                // Store current status for later saving (from orders1.html)
+
+                const displayStatus = STATUS_DISPLAY_NAMES[order.status] || order.status;
+                const statusClass = `status-${order.status.replace(/ /g, '_').toLowerCase()}`;
+
+                // Store current status for later saving
                 currentStatuses[order.id] = order.status;
 
-                // Determine if this order item should blink (from orders1.html)
+                // Determine if this order item should blink
                 const shouldBlink = (
                     ['packed', 'shipped', 'out_for_delivery'].includes(order.status) &&
                     lastViewedStatuses[order.id] !== order.status
                 );
                 const blinkClass = shouldBlink ? 'blink-status' : '';
 
-                let trackingHtml = ''; // from orders1.html
+                let trackingHtml = '';
                 if (STATUS_TRACK_STEPS.includes(order.status)) {
                     const currentIndex = STATUS_TRACK_STEPS.indexOf(order.status);
                     trackingHtml = `
@@ -429,9 +437,9 @@
                 }
 
                 let actionButtons = '';
-                let feedbackButton = ''; // from orders.html
+                let feedbackButton = '';
 
-                // Check for existing review (from orders.html)
+                // Check for existing review
                 const { data: existingReview, error: reviewError } = await supabase
                     .from('product_reviews')
                     .select('id')
@@ -472,8 +480,7 @@
                         <h5>${productName}</h5>
                         <p>Order ID: ${order.id}</p>
                         <p>Quantity: ${order.quantity} | Price: ₹${productPrice}</p>
-                        <p>Total: ₹${order.total_price}</p>
-                        <p>Order Date: ${new Date(order.created_at).toLocaleDateString()}</p>
+                        <p>Total: ₹${totalPrice}</p> <p>Order Date: ${new Date(order.created_at).toLocaleDateString()}</p>
 
                         ${trackingHtml} <p>Status: <span class="status-${order.status.replace(/ /g, '_')} status-badge ${blinkClass}">${displayStatus.toUpperCase()}</span></p>
 
@@ -486,7 +493,7 @@
                 ordersList.appendChild(orderCard);
             }
 
-            // After rendering, save the current statuses to localStorage (from orders1.html)
+            // After rendering, save the current statuses to localStorage
             saveCurrentStatuses(currentStatuses);
         }
 
@@ -506,7 +513,7 @@
                 return;
             }
 
-            // Prevent cancellation if already in a final or return state (from orders.html and improved)
+            // Prevent cancellation if already in a final or return state
             const nonCancellableStatuses = ['delivered', 'returned', 'cancelled', 'return_requested'];
             if (nonCancellableStatuses.includes(orderToCancel.status)) {
                 alert("This order cannot be cancelled as its status is already " + (STATUS_DISPLAY_NAMES[orderToCancel.status] || orderToCancel.status) + ".");
@@ -582,7 +589,7 @@
             }
         }
 
-        // Functions for Feedback Modal (from orders.html)
+        // Functions for Feedback Modal
         function openFeedbackModal(orderId, productId, productName, productImage) {
             document.getElementById('feedbackOrderId').value = orderId;
             document.getElementById('feedbackProductId').value = productId;

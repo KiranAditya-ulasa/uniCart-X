@@ -241,7 +241,7 @@ async function initOrderPage() {
 
   document.getElementById("productImage").src = img;
   document.getElementById("productTitle").textContent = productName || "Product";
-  document.getElementById("productPrice").textContent = productPrice ? `Price: ₹${productPrice}` : "";
+  document.getElementById("productPrice").textContent = productPrice ? `Price: $${productPrice}` : "";
 
   if (user) {
     infoDiv.innerHTML = `
